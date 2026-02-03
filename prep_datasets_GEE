@@ -1,0 +1,100 @@
+// CROPS prep_datasets_GEE (NDVI quality mosaic from Sentinel-2 SR)
+
+// -----------------------------
+// 1) Region and metadata
+// -----------------------------
+
+// ROI geometry (must be defined/imported in your GEE Assets or script, e.g., as a FeatureCollection/Geometry)
+var roi = B1;
+
+// Region name tag used in exported filenames
+var Region = 'B1';
+
+// Year tag used only for export naming (not used in filtering directly)
+var Year = '2021';
+
+// -----------------------------
+// 2) Time window settings
+// -----------------------------
+
+// Time range for South America example (adjust as needed)
+var startDate = '2020-10-01';
+var endDate   = '2021-01-14';
+
+
+// Cloud cover threshold (%), used to filter Sentinel-2 images by metadata
+var cloudCoverMax = 50;
+
+// -----------------------------
+// 3) Build Sentinel-2 SR collection
+// -----------------------------
+
+// Create Sentinel-2 surface reflectance image collection
+// - Filter by date
+// - Filter by scene-level cloudy pixel percentage
+// - Select bands used downstream (note: B5 is included in select but not exported in this script)
+var collection = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterDate(startDate, endDate)
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', cloudCoverMax))
+  .select(['B2', 'B3', 'B4', 'B8', 'B11', 'B5', 'B12'])
+  .filterBounds(roi);
+
+// -----------------------------
+// 4) Add NDVI band to each image
+// -----------------------------
+
+// Compute NDVI = (NIR - RED) / (NIR + RED)
+// Sentinel-2: NIR = B8, RED = B4
+var collectionWithNDVI = collection.map(function(image) {
+  var ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
+  return image.addBands(ndvi);
+});
+
+// -----------------------------
+// 5) NDVI Quality Mosaic (NDVI-QM)
+// -----------------------------
+
+// Build a quality mosaic using NDVI as the quality score
+// For each pixel, the mosaic selects the observation (date) with maximum NDVI
+var maxNDVI = collectionWithNDVI.qualityMosaic('NDVI');
+
+// Print the resulting mosaic to the console for inspection
+print(maxNDVI);
+
+// -----------------------------
+// 6) Export: RGB composite (B2/B3/B4) at 10 m
+// -----------------------------
+
+// Select RGB bands and clip to ROI
+var maxNDVI_RGB = maxNDVI.select(['B2', 'B3', 'B4']).clip(roi);
+
+// Export RGB composite to Google Drive
+Export.image.toDrive({
+  image: maxNDVI_RGB,
+  description: Region + '_S20114_B234_' + Year,
+  folder: 'B234',
+  scale: 10,
+  region: roi,
+  maxPixels: 1e13
+});
+
+// Optional visualization (commented):
+// Map.addLayer(maxNDVI_RGB, {min: 0, max: 3000}, 'NDVI-QM RGB');
+
+// -----------------------------
+// 7) Export: NIR + SWIR1 (B8/B11) at 10 m (note: B11 native is 20 m)
+// -----------------------------
+
+// Select B8 (10 m) and B11 (20 m) then clip to ROI
+// Note: exporting at 10 m will resample B11 from 20 m to 10 m during export
+var maxNDVI_B8B11 = maxNDVI.select(['B8', 'B11']).clip(roi);
+
+// Export B8/B11 composite to Google Drive
+Export.image.toDrive({
+  image: maxNDVI_B8B11,
+  description: Region + '_S20114_B811_' + Year,
+  folder: 'B811',
+  scale: 10,
+  region: roi,
+  maxPixels: 1e13
+});
