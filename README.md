@@ -1,4 +1,4 @@
-# CROPS: Source-Free UDA for Crop-Type Semantic Segmentation
+# CROPS: Source-Free UDA for in-season Crop-Type Semantic Segmentation
 
 This repository implements **CROPS** for **source-free unsupervised domain adaptation (SF-UDA)** in satellite-image crop-type semantic segmentation. A segmentation model is first trained on a labeled **source** domain and then adapted to an **unlabeled target** domain using only pretrained parameters and target images (no source images or labels are used during adaptation).
 
