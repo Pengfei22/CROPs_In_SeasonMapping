@@ -4,7 +4,7 @@ This repository implements **CROPS** for **source-free unsupervised domain adapt
 
 ---
 
-## Method overview (medium length)
+## Method overview
 
 CROPS combines three components:
 
